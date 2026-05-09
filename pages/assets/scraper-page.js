@@ -17,7 +17,7 @@ const state = {
   jobId:   params.get("jobId") || ("job-" + Date.now()),
   lang:    params.get("lang") || localStorage.getItem("basira.lang") || "en",
   theme:   params.get("theme") || localStorage.getItem("basira.theme") || "dark",
-  mode:    params.get("mode") || "visual",
+  mode:    params.get("mode") || "visual",   // visual is the default — manual is a fallback
   stealth: params.get("stealth") === "1",
   rowLimit: parseInt(params.get("rowLimit") || "0", 10) || null,
   data:    [],
@@ -43,6 +43,10 @@ function show(view) {
   for (const id of ["select-screen", "manual-screen", "loading-screen", "error-screen", "results-screen"]) {
     $(id).hidden = id !== view;
   }
+  // When the visual-selection iframe is showing, give it the full
+  // viewport (hide the top nav). Other screens keep the nav.
+  if (view === "select-screen") document.body.classList.add("bs-iframe-mode");
+  else                          document.body.classList.remove("bs-iframe-mode");
 }
 
 // ── kick off the right view ──────────────────────────────────
@@ -58,8 +62,6 @@ if (!state.url) {
 // │  Visual selection via iframe + postMessage               │
 // ╰──────────────────────────────────────────────────────────╯
 function startVisual() {
-  $("iframe-url").textContent = state.url;
-  $("iframe-note").textContent = t.iframeNote;
   show("select-screen");
 
   const iframe = $("selection-iframe");
@@ -67,6 +69,33 @@ function startVisual() {
 
   // listen for the selection coming back from the iframe
   window.addEventListener("message", onIframeMessage, false);
+
+  // Some sites detect framing with JS and stay blank. Show a hint
+  // after a few seconds so the user can switch to manual mode.
+  setTimeout(() => {
+    try {
+      const doc = iframe.contentDocument;
+      const empty = !doc || !doc.body || !doc.body.children.length;
+      if (empty) showBlankHint();
+    } catch (_) {
+      // cross-origin — likely loaded fine but we can't peek; ignore
+    }
+  }, 6000);
+}
+
+function showBlankHint() {
+  const hint = $("iframe-blank-hint");
+  if (!hint) return;
+  $("iframe-note").textContent =
+    state.lang === "ar"
+      ? "الموقع رفض التحميل داخل الإطار. حوّل إلى الوضع اليدوي والصق محدِّدات CSS."
+      : "The site refused to be embedded. Switch to manual mode and paste CSS selectors.";
+  hint.hidden = false;
+  $("switch-to-manual").onclick = () => {
+    hint.hidden = true;
+    window.removeEventListener("message", onIframeMessage, false);
+    startManual();
+  };
 }
 
 function onIframeMessage(ev) {

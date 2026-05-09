@@ -8,7 +8,8 @@
   <link rel="stylesheet" href="/assets/styles.css" />
 </head>
 <body>
-  <nav class="bs-nav">
+  <!-- Top nav (only shown for manual / loading / results screens; hidden while iframe is full-screen) -->
+  <nav class="bs-nav" id="top-nav">
     <div style="display:flex;align-items:center;gap:10px">
       <img src="/basira-logo.png" style="width:32px;height:32px;object-fit:contain" alt="logo"/>
       <span class="bs-brand" style="font-size:1.1rem">Basira Scraper</span>
@@ -22,14 +23,18 @@
     </div>
   </nav>
 
-  <!-- ──── Visual selection workspace (iframe) ────────────── -->
-  <div id="select-screen" class="bs-iframe-wrap" hidden>
-    <div class="bs-iframe-toolbar">
-      <span style="font-size:.78rem">🌐</span>
-      <div class="bs-iframe-url" id="iframe-url"></div>
-      <span id="iframe-note" style="color:var(--warning);font-size:.74rem"></span>
+  <!-- ──── Visual selection workspace (full-screen iframe, no chrome) ──── -->
+  <!-- Mirrors the original maximized Chromium window: target page fills    -->
+  <!-- the viewport and the sidebar overlay (injected by the worker proxy)  -->
+  <!-- floats on the right.                                                 -->
+  <div id="select-screen" class="bs-iframe-fullscreen" hidden>
+    <iframe id="selection-iframe" class="bs-iframe-full" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
+    <!-- Tiny floating fallback notice in case the iframe stays blank -->
+    <div id="iframe-blank-hint" class="bs-iframe-blank-hint" hidden>
+      <div style="font-size:.85rem;font-weight:700;margin-bottom:6px">⚠️ This site blocks framing</div>
+      <div style="font-size:.78rem;color:var(--text-dim);margin-bottom:10px" id="iframe-note"></div>
+      <button id="switch-to-manual" class="bs-btn bs-btn-primary bs-btn-full" style="font-size:.8rem">Switch to manual mode</button>
     </div>
-    <iframe id="selection-iframe" class="bs-iframe" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
   </div>
 
   <!-- ──── Manual selectors workspace ─────────────────────── -->
