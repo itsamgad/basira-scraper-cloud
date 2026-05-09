@@ -44,13 +44,45 @@ export const overlayScript = String.raw`
   var pickingMode        = null; // 'pagination' | 'load-more' | null
 
   // ── helpers ─────────────────────────────────────────────────
+  // Port of the original `isStableClass` from src/utils/overlay-injector.js.
+  // Filters out Tailwind utilities, arbitrary-value classes (`text-[15px]`),
+  // CSS-module hex hashes (`a3f2c1`), state classes (`active`, `js-*`, …),
+  // and our own panel marker class.
+  function isStableClass(cls) {
+    if (!cls || cls.length < 2 || cls.length >= 40) return false;
+    if (cls.indexOf('basira') === 0 || cls.indexOf('__bs') === 0) return false;
+    if (cls.indexOf(':') >= 0 || cls.indexOf('[') >= 0 || cls.indexOf('/') >= 0) return false;
+    if (/^(active|hover|focus|selected|open|show|hide)$/i.test(cls)) return false;
+    if (/^(js-|is-|has-)/.test(cls)) return false;
+    // CSS-module hex-only class names (mostly hex chars, ≥6 of them)
+    var hexCount = 0;
+    for (var i = 0; i < cls.length; i++) {
+      var c = cls[i].toLowerCase();
+      if ((c >= 'a' && c <= 'f') || (c >= '0' && c <= '9')) hexCount++;
+    }
+    if (hexCount > 5 && hexCount >= cls.length * 0.8) return false;
+    // Common Tailwind single-word utilities to skip
+    var tw = ['flex','grid','block','inline','hidden','relative','absolute','fixed','sticky',
+      'text','font','bg','gap','border','shadow','rounded','overflow','cursor','items',
+      'justify','grow','shrink','leading','tracking','transition','animate','opacity',
+      'p','m','w','h','px','py','mx','my','pt','pb','pl','pr','mt','mb','ml','mr',
+      'space','divide','container','group','peer','sr','order','col','row'];
+    if (tw.indexOf(cls) >= 0) return false;
+    // Tailwind compound utilities (text-sm, bg-blue-500, p-4, etc.)
+    if (/^(text|bg|border|p|m|w|h|px|py|mx|my|pt|pb|pl|pr|mt|mb|ml|mr|gap|space|rounded|shadow|opacity|z|leading|tracking|font|grid|col|row|order|inset|top|bottom|left|right)-/.test(cls)) return false;
+    return true;
+  }
+
   function getBestClass(el) {
     if (!el || !el.className || typeof el.className !== 'string') return null;
-    var classes = el.className.split(/\s+/).filter(function(c) {
-      return c && !/^(active|hover|focus|selected|open|show|hide)$/i.test(c)
-                && !/^(js-|is-|has-)/.test(c) && c.length > 1 && c.length < 40;
-    });
-    return classes[0] || null;
+    var classes = el.className.split(/\s+/).filter(isStableClass);
+    if (!classes.length) return null;
+    // Prefer BEM-style classes (contain `__` or `--`) — they're component-scoped
+    var bem = classes.filter(function(c) { return c.indexOf('__') >= 0 || c.indexOf('--') >= 0; });
+    if (bem.length) return bem[0];
+    // Otherwise prefer the longest one (most specific)
+    classes.sort(function(a, b) { return b.length - a.length; });
+    return classes[0];
   }
 
   function getSelector(el) {
@@ -104,13 +136,33 @@ export const overlayScript = String.raw`
     return max >= 2 ? best : null;
   }
 
+  // Returns { type, target, sample }. If the user clicks a container that
+  // wraps an <img> or a single short <a>, we redirect the target so the
+  // selector points to the meaningful child — this matches the original.
   function inferType(el) {
     var tag = el.tagName.toLowerCase();
-    if (tag === 'img') return 'image';
-    if (tag === 'a')   return 'link';
-    var t = (el.textContent || '').trim();
-    if (/^[$€£¥₹]?\s*\d[\d.,\s]*$/.test(t)) return 'price';
-    return 'text';
+    if (tag === 'img') {
+      return { type: 'image', target: el, sample: el.src || el.getAttribute('data-src') || '' };
+    }
+    if (tag === 'a') {
+      return { type: 'link', target: el, sample: el.href || '' };
+    }
+    var text = (el.textContent || '').trim();
+    // Redirect to <img> if container has one
+    var imgs = el.getElementsByTagName('img');
+    if (imgs.length >= 1 && imgs[0].src) {
+      return { type: 'image', target: imgs[0], sample: imgs[0].src || imgs[0].getAttribute('data-src') || '' };
+    }
+    // Redirect to single short <a>
+    var links = el.getElementsByTagName('a');
+    if (links.length === 1 && text.length < 120) {
+      return { type: 'link', target: links[0], sample: links[0].href || '' };
+    }
+    // Strict price patterns (matches original): currency-prefix or -suffix, no other chars
+    if (/^[£$€¥₹][\d,]+\.?\d*$/.test(text) || /^[\d,]+\.?\d*[£$€¥₹]$/.test(text)) {
+      return { type: 'price', target: el, sample: text };
+    }
+    return { type: 'text', target: el, sample: text.substring(0, 60) };
   }
 
   // ── selection panel UI ──────────────────────────────────────
@@ -209,13 +261,14 @@ export const overlayScript = String.raw`
       }
       var fname = prompt('Field name?', 'field_' + (++fieldCounter));
       if (!fname) return;
-      var ftype = inferType(e.target);
-      var fselector = relativeSelectorWithin(referenceItem, e.target);
+      var info = inferType(e.target);
+      // If inferType redirected to a better child (img/a), use its selector
+      var fselector = relativeSelectorWithin(referenceItem, info.target);
       selectedFields.push({
         name: fname,
         selector: fselector,
-        sample: (e.target.textContent || '').trim().slice(0, 60),
-        type: ftype,
+        sample: info.sample,
+        type: info.type,
       });
       showSelectingPanel();
     } else {

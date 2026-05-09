@@ -159,6 +159,10 @@ async function runScrape(selection) {
   $("loading-title").textContent = t.extracting;
   $("loading-sub").textContent   = t.collectingItems;
 
+  // Poll progress while the scrape request is in flight, so the loading
+  // screen can show live counts instead of just a spinner.
+  const progressTimer = setInterval(pollProgress, 1200);
+
   try {
     const res = await fetch(`${WORKER_URL}/api/scrape`, {
       method: "POST",
@@ -185,7 +189,46 @@ async function runScrape(selection) {
     show("results-screen");
   } catch (err) {
     showError(err.message || String(err));
+  } finally {
+    clearInterval(progressTimer);
   }
+}
+
+async function pollProgress() {
+  try {
+    const res = await fetch(
+      `${WORKER_URL}/api/results?action=progress&jobId=${encodeURIComponent(state.jobId)}`
+    );
+    if (!res.ok) return;
+    const json = await res.json();
+    const p = json && json.progress;
+    if (!p) return;
+    if (p.status === "starting") {
+      $("loading-sub").textContent =
+        state.lang === "ar" ? "جاري تشغيل المتصفح…" : "Launching browser…";
+    } else if (p.status === "extracting") {
+      const items = p.itemsCollected || 0;
+      const total = p.totalToProcess || null;
+      const page  = p.currentPage   || null;
+      const parts = [];
+      if (page && p.totalPages && p.totalPages !== "?") {
+        parts.push(state.lang === "ar"
+          ? `الصفحة ${page} من ${p.totalPages}`
+          : `Page ${page} of ${p.totalPages}`);
+      } else if (page) {
+        parts.push(state.lang === "ar" ? `الصفحة ${page}` : `Page ${page}`);
+      }
+      parts.push(state.lang === "ar"
+        ? `تم جمع ${items}${total ? " / " + total : ""} عنصر`
+        : `${items}${total ? " / " + total : ""} items collected`);
+      if (p.failedItems) {
+        parts.push(state.lang === "ar"
+          ? `${p.failedItems} فشل`
+          : `${p.failedItems} failed`);
+      }
+      $("loading-sub").textContent = parts.join(" · ");
+    }
+  } catch (_) { /* ignore network blips */ }
 }
 
 function showError(msg) {

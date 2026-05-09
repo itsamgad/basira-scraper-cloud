@@ -23,7 +23,7 @@
 
 import { launch } from "@cloudflare/playwright";
 import { jsonResponse, errorResponse } from "./cors.js";
-import { saveResult } from "./results.js";
+import { saveResult, saveProgress } from "./results.js";
 import { addHistoryEntry } from "./history.js";
 
 // User-Agent pool used when stealth mode is enabled
@@ -67,6 +67,12 @@ export async function handleScrape(request, env, ctx) {
 
   const startTime = Date.now();
   let browser;
+
+  // Tell the frontend we've started right away.
+  await saveProgress(env, jobId, {
+    status: "starting", currentPage: 0, totalPages: "?",
+    itemsCollected: 0, failedItems: 0,
+  });
 
   try {
     // ── launch Browser Rendering ──────────────────────────
@@ -116,7 +122,7 @@ export async function handleScrape(request, env, ctx) {
     let failedItems = 0;
 
     if (loadingMethod === "pagination" && paginationSelector) {
-      const r = await paginationLoad(page, parentSelector, itemSelector, paginationSelector, fields, requestedLimit);
+      const r = await paginationLoad(page, parentSelector, itemSelector, paginationSelector, fields, requestedLimit, env, jobId);
       data = r.allData;
       validItemIndex = r.totalLoaded;
       failedItems = r.failedItems;
@@ -130,6 +136,11 @@ export async function handleScrape(request, env, ctx) {
       const items = await page.$$(`${parentSelector} ${itemSelector}`);
       const limited = items.slice(0, requestedLimit);
 
+      await saveProgress(env, jobId, {
+        status: "extracting", currentPage: 1, totalPages: 1,
+        itemsCollected: 0, failedItems: 0, totalToProcess: limited.length,
+      });
+
       for (let i = 0; i < limited.length; i++) {
         const { rowData, hasData } = await extractItemWithRetry(limited[i], fields, page, 3);
         if (hasData) {
@@ -140,6 +151,14 @@ export async function handleScrape(request, env, ctx) {
         } else {
           failedItems++;
         }
+        // every 5 items, push a progress update
+        if ((i + 1) % 5 === 0 || i === limited.length - 1) {
+          await saveProgress(env, jobId, {
+            status: "extracting", currentPage: 1, totalPages: 1,
+            itemsCollected: validItemIndex, failedItems,
+            totalToProcess: limited.length,
+          });
+        }
       }
     }
 
@@ -147,7 +166,7 @@ export async function handleScrape(request, env, ctx) {
 
     // ── persist to KV (best-effort) ───────────────────────
     if (jobId) {
-      try { await saveResult(env, jobId, { fields, data }); } catch (e) { console.warn("saveResult:", e.message); }
+      try { await saveResult(env, jobId, { url, fields, data }); } catch (e) { console.warn("saveResult:", e.message); }
       try {
         await addHistoryEntry(env, {
           id: jobId,
@@ -159,6 +178,11 @@ export async function handleScrape(request, env, ctx) {
           duration,
         });
       } catch (e) { console.warn("addHistoryEntry:", e.message); }
+      // mark the job as done so the frontend stops polling progress
+      await saveProgress(env, jobId, {
+        status: "done", currentPage: 1, totalPages: 1,
+        itemsCollected: validItemIndex, failedItems,
+      });
     }
 
     await browser.close();
@@ -176,6 +200,11 @@ export async function handleScrape(request, env, ctx) {
   } catch (error) {
     console.error("Scrape error:", error);
     if (browser) { try { await browser.close(); } catch (_) {} }
+    if (jobId) {
+      await saveProgress(env, jobId, {
+        status: "error", error: error.message || "Scrape failed",
+      });
+    }
     return errorResponse(error.message || "Scrape failed", env, 500);
   }
 }
@@ -283,7 +312,7 @@ async function loadMoreLoad(page, containerSel, itemSel, buttonSel, maxRows = In
   );
 }
 
-async function paginationLoad(page, containerSel, itemSel, buttonSel, fields, maxRows = Infinity) {
+async function paginationLoad(page, containerSel, itemSel, buttonSel, fields, maxRows = Infinity, env, jobId) {
   const allData = [];
   let validItemIndex = 0;
   let failedItems = 0;
@@ -293,6 +322,14 @@ async function paginationLoad(page, containerSel, itemSel, buttonSel, fields, ma
 
   while (pageNum < maxPages) {
     pageNum++;
+
+    // tell the user which page we're on
+    if (env && jobId) {
+      await saveProgress(env, jobId, {
+        status: "extracting", currentPage: pageNum, totalPages: "?",
+        itemsCollected: validItemIndex, failedItems,
+      });
+    }
 
     let itemsFound = false;
     for (let t = 0; t < 3; t++) {
