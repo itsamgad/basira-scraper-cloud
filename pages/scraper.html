@@ -8,8 +8,8 @@
   <link rel="stylesheet" href="/assets/styles.css" />
 </head>
 <body>
-  <!-- Top nav (only shown for manual / loading / results screens; hidden while iframe is full-screen) -->
-  <nav class="bs-nav" id="top-nav">
+  <!-- Top nav -->
+  <nav class="bs-nav">
     <div style="display:flex;align-items:center;gap:10px">
       <img src="/basira-logo.png" style="width:32px;height:32px;object-fit:contain" alt="logo"/>
       <span class="bs-brand" style="font-size:1.1rem">Basira Scraper</span>
@@ -23,19 +23,11 @@
     </div>
   </nav>
 
-  <!-- ──── Visual selection workspace (full-screen iframe, no chrome) ──── -->
-  <!-- Mirrors the original maximized Chromium window: target page fills    -->
-  <!-- the viewport and the sidebar overlay (injected by the worker proxy)  -->
-  <!-- floats on the right.                                                 -->
-  <div id="select-screen" class="bs-iframe-fullscreen" hidden>
-    <iframe id="selection-iframe" class="bs-iframe-full" sandbox="allow-scripts allow-same-origin allow-forms allow-popups"></iframe>
-    <!-- Tiny floating fallback notice in case the iframe stays blank -->
-    <div id="iframe-blank-hint" class="bs-iframe-blank-hint" hidden>
-      <div style="font-size:.85rem;font-weight:700;margin-bottom:6px">⚠️ This site blocks framing</div>
-      <div style="font-size:.78rem;color:var(--text-dim);margin-bottom:10px" id="iframe-note"></div>
-      <button id="switch-to-manual" class="bs-btn bs-btn-primary bs-btn-full" style="font-size:.8rem">Switch to manual mode</button>
-    </div>
-  </div>
+  <!-- Visual selection no longer happens in this page. The home page    -->
+  <!-- opens the worker /proxy URL directly in a new tab — the user      -->
+  <!-- sees the actual target site filling the window with the sidebar   -->
+  <!-- overlay. After they click Extract, the overlay redirects them     -->
+  <!-- back here with ?autorun=1&selection=… and the scrape runs.        -->
 
   <!-- ──── Manual selectors workspace ─────────────────────── -->
   <div id="manual-screen" class="bs-page" hidden>

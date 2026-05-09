@@ -100,19 +100,24 @@ function handleStart() {
   if (!/^https?:\/\//i.test(raw)) raw = "https://" + raw;
 
   const jobId = "job-" + Date.now();
+
+  // Open the WORKER /proxy endpoint directly in a new tab. The proxy
+  // serves the actual target site (with the overlay sidebar injected
+  // by the worker), so the user sees the real website filling the
+  // window — exactly like the original Chromium maximized window.
+  // After they pick elements + click Extract, the overlay script
+  // navigates the same tab back to /scraper.html?...selection=...
+  // where the worker runs the actual scrape and shows the results.
   const params = new URLSearchParams({
-    url:     raw,
+    url:      raw,
     jobId,
-    lang:    state.lang,
-    theme:   state.theme,
-    stealth: state.stealth ? "1" : "0",
+    lang:     state.lang,
+    stealth:  state.stealth ? "1" : "0",
+    pagesUrl: window.location.origin,
   });
   if (rowLimit) params.set("rowLimit", rowLimit);
 
-  // Open the scraper screen in a NEW TAB so the home page stays as a
-  // "control room" — just like the original local app opened a new
-  // browser window.
-  window.open("/scraper.html?" + params.toString(), "_blank", "noopener");
+  window.open(`${WORKER_URL}/proxy?` + params.toString(), "_blank", "noopener");
 }
 
 // ── history ──────────────────────────────────────────────────

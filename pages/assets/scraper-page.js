@@ -40,75 +40,37 @@ $("back-btn").onclick   = () => window.location.href = "/";
 
 // ── view switching ───────────────────────────────────────────
 function show(view) {
-  for (const id of ["select-screen", "manual-screen", "loading-screen", "error-screen", "results-screen"]) {
+  for (const id of ["manual-screen", "loading-screen", "error-screen", "results-screen"]) {
     $(id).hidden = id !== view;
   }
-  // When the visual-selection iframe is showing, give it the full
-  // viewport (hide the top nav). Other screens keep the nav.
-  if (view === "select-screen") document.body.classList.add("bs-iframe-mode");
-  else                          document.body.classList.remove("bs-iframe-mode");
 }
 
 // ── kick off the right view ──────────────────────────────────
 if (!state.url) {
   showError("No URL provided. Go back and enter a URL.");
+} else if (params.get("autorun") === "1" && params.get("selection")) {
+  // Coming back from the proxied page: the overlay redirected us here
+  // with the user's selection encoded in the URL. Decode and run.
+  try {
+    const selection = JSON.parse(decodeURIComponent(params.get("selection")));
+    runScrape(selection);
+  } catch (e) {
+    showError("Could not parse selection: " + e.message);
+  }
 } else if (state.mode === "manual") {
   startManual();
 } else {
-  startVisual();
+  // Fallback: someone landed here directly without going through the
+  // proxy (e.g. opened scraper.html in a tab manually). Offer manual.
+  startManual();
 }
 
 // ╭──────────────────────────────────────────────────────────╮
-// │  Visual selection via iframe + postMessage               │
+// │  (Visual selection now happens on the worker proxy URL,  │
+// │   not in an iframe inside this page. After the user      │
+// │   clicks Extract, the overlay redirects back here with   │
+// │   ?selection=…&autorun=1 — handled at the top of file.)  │
 // ╰──────────────────────────────────────────────────────────╯
-function startVisual() {
-  show("select-screen");
-
-  const iframe = $("selection-iframe");
-  iframe.src = `${WORKER_URL}/proxy?url=${encodeURIComponent(state.url)}`;
-
-  // listen for the selection coming back from the iframe
-  window.addEventListener("message", onIframeMessage, false);
-
-  // Some sites detect framing with JS and stay blank. Show a hint
-  // after a few seconds so the user can switch to manual mode.
-  setTimeout(() => {
-    try {
-      const doc = iframe.contentDocument;
-      const empty = !doc || !doc.body || !doc.body.children.length;
-      if (empty) showBlankHint();
-    } catch (_) {
-      // cross-origin — likely loaded fine but we can't peek; ignore
-    }
-  }, 6000);
-}
-
-function showBlankHint() {
-  const hint = $("iframe-blank-hint");
-  if (!hint) return;
-  $("iframe-note").textContent =
-    state.lang === "ar"
-      ? "الموقع رفض التحميل داخل الإطار. حوّل إلى الوضع اليدوي والصق محدِّدات CSS."
-      : "The site refused to be embedded. Switch to manual mode and paste CSS selectors.";
-  hint.hidden = false;
-  $("switch-to-manual").onclick = () => {
-    hint.hidden = true;
-    window.removeEventListener("message", onIframeMessage, false);
-    startManual();
-  };
-}
-
-function onIframeMessage(ev) {
-  if (!ev.data || ev.data.basira !== true) return;
-  if (ev.data.type === "cancelled") {
-    window.location.href = "/";
-    return;
-  }
-  if (ev.data.type === "selection") {
-    window.removeEventListener("message", onIframeMessage, false);
-    runScrape(ev.data.payload);
-  }
-}
 
 // ╭──────────────────────────────────────────────────────────╮
 // │  Manual selectors workspace                               │

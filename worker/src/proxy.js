@@ -92,7 +92,26 @@ export async function handleProxy(request, env) {
   );
 
   // ── inject overlay script before </body> ────────────────
-  const injection = `<script>${overlayScript}</script>`;
+  // We pass the runtime context (jobId, pagesUrl, source url) into a
+  // global the overlay reads, so on Extract it can redirect the tab
+  // back to scraper.html with the selection encoded in the URL.
+  const jobId    = url.searchParams.get("jobId")    || "job-" + Date.now();
+  const pagesUrl = url.searchParams.get("pagesUrl") || "";
+  const lang     = url.searchParams.get("lang")     || "en";
+  const stealth  = url.searchParams.get("stealth")  || "0";
+  const rowLimit = url.searchParams.get("rowLimit") || "";
+
+  const ctx =
+    `<script>window.__BASIRA__ = ${JSON.stringify({
+      jobId,
+      pagesUrl,
+      lang,
+      stealth,
+      rowLimit,
+      sourceUrl: targetUrl.toString(),
+    })};</script>`;
+
+  const injection = ctx + `<script>${overlayScript}</script>`;
   if (/<\/body>/i.test(html)) {
     html = html.replace(/<\/body>/i, injection + "</body>");
   } else {

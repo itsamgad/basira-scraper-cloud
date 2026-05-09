@@ -155,7 +155,8 @@ export const overlayScript = String.raw`
     );
     document.getElementById('__bs_start').onclick  = startSelection;
     document.getElementById('__bs_cancel').onclick = function() {
-      try { window.parent.postMessage({ basira: true, type: 'cancelled' }, '*'); } catch (e) {}
+      var ctx = window.__BASIRA__ || {};
+      window.location.href = ctx.pagesUrl || '/';
     };
   }
 
@@ -340,7 +341,19 @@ export const overlayScript = String.raw`
     );
 
     try {
-      window.parent.postMessage({ basira: true, type: 'selection', payload: result }, '*');
+      var ctx = window.__BASIRA__ || {};
+      var qs = new URLSearchParams({
+        jobId:    ctx.jobId    || '',
+        url:      ctx.sourceUrl || '',
+        lang:     ctx.lang     || 'en',
+        stealth:  ctx.stealth  || '0',
+        rowLimit: ctx.rowLimit || '',
+        autorun:  '1',
+        selection: encodeURIComponent(JSON.stringify(result)),
+      });
+      var dest = (ctx.pagesUrl || '') + '/scraper.html?' + qs.toString();
+      // Brief pause so the user sees the "captured" panel for a moment.
+      setTimeout(function() { window.location.href = dest; }, 600);
     } catch (e) {}
   }
 
