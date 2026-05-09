@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Basira Scraper</title>
+  <link rel="icon" type="image/png" href="/basira-logo.png" />
+  <link rel="stylesheet" href="/assets/styles.css" />
+</head>
+<body>
+  <!-- Nav -->
+  <nav class="bs-nav">
+    <div style="display:flex;align-items:center;gap:12px">
+      <img src="/basira-logo.png" style="width:36px;height:36px;object-fit:contain" alt="Basira logo" />
+      <span class="bs-brand" id="brand">Basira</span>
+    </div>
+    <div class="bs-nav-actions">
+      <button class="bs-icon-btn" id="lang-toggle" style="font-weight:700;font-size:13px;width:auto;padding:0 12px">AR</button>
+      <button class="bs-icon-btn" id="theme-toggle">☀️</button>
+    </div>
+  </nav>
+
+  <main class="bs-page">
+    <!-- Hero -->
+    <div style="text-align:center;padding-top:16px;padding-bottom:8px">
+      <img src="/basira-logo.png" style="width:88px;height:88px;object-fit:contain;margin-bottom:16px" alt="Basira logo" />
+      <h1 style="font-size:2.2rem;font-weight:800;letter-spacing:-1px;color:var(--accent);font-family:var(--mono);margin-bottom:10px">Basira Scraper</h1>
+      <p id="subtitle" style="font-size:.95rem;color:var(--text-dim);max-width:520px;margin:0 auto"></p>
+    </div>
+
+    <!-- URL Card -->
+    <div class="bs-card" style="max-width:760px;width:100%;margin:0 auto">
+      <div style="display:flex;gap:10px">
+        <input id="url-input" class="bs-input" type="url" placeholder="https://example.com" style="direction:ltr" />
+        <input id="row-input" class="bs-input bs-input-sm" type="number" placeholder="Max rows" min="1" style="width:110px;text-align:center" />
+        <button id="start-btn" class="bs-btn bs-btn-primary"><span id="start-label">Start →</span></button>
+      </div>
+
+      <div id="url-error"></div>
+      <div id="row-error"></div>
+
+      <button id="advanced-toggle" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:.8rem;font-weight:600;padding:8px 0 0;font-family:var(--sans)">▼ <span id="advanced-label">Advanced Options</span></button>
+
+      <div id="advanced-panel" class="bs-advanced-panel" hidden>
+        <!-- Stealth -->
+        <div id="stealth-row" class="bs-toggle-row">
+          <div>
+            <div class="bs-toggle-row-label">🥷 <span id="stealth-label">Stealth Mode</span></div>
+            <div class="bs-toggle-row-desc" id="stealth-desc">Rotate user agents &amp; add human delays</div>
+          </div>
+          <button id="stealth-toggle" class="bs-toggle" style="background:var(--border-2)">
+            <div class="bs-toggle-thumb" style="left:3px"></div>
+          </button>
+        </div>
+
+        <!-- Mode (Visual vs Manual) -->
+        <div class="bs-toggle-row" id="mode-row">
+          <div>
+            <div class="bs-toggle-row-label">✋ <span id="mode-label">Selection mode</span></div>
+            <div class="bs-toggle-row-desc"><span id="mode-desc">Visual selection (recommended) or paste CSS selectors</span></div>
+          </div>
+          <select id="mode-select" class="bs-input" style="width:160px">
+            <option value="visual">Visual</option>
+            <option value="manual">Manual</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <!-- Feature cards -->
+    <div class="bs-feat-grid" style="max-width:760px;width:100%;margin:0 auto">
+      <div class="bs-feat-card"><div class="bs-feat-label">JS</div><div class="bs-feat-desc" id="f1">JS Support</div></div>
+      <div class="bs-feat-card"><div class="bs-feat-label">EN/AR</div><div class="bs-feat-desc" id="f2">Bilingual</div></div>
+      <div class="bs-feat-card"><div class="bs-feat-label">👆</div><div class="bs-feat-desc" id="f3">Point &amp; Click</div></div>
+      <div class="bs-feat-card"><div class="bs-feat-label">⚡</div><div class="bs-feat-desc" id="f4">All Load Methods</div></div>
+    </div>
+
+    <!-- History -->
+    <div style="max-width:760px;width:100%;margin:0 auto">
+      <div class="bs-section-head">
+        <span class="bs-section-title">🕐 <span id="history-label">Recent Scrapes</span></span>
+        <button id="history-clear" hidden style="background:none;border:none;color:var(--text-muted);font-size:.75rem;cursor:pointer;font-family:var(--sans)">Clear all</button>
+      </div>
+      <div id="history-list"></div>
+    </div>
+  </main>
+
+  <script type="module" src="/assets/app.js"></script>
+</body>
+</html>

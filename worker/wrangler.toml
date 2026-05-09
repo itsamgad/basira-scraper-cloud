@@ -1,0 +1,45 @@
+# ╭─────────────────────────────────────────────────────────────╮
+# │   Basira Scraper — Cloudflare Worker configuration          │
+# ╰─────────────────────────────────────────────────────────────╯
+#
+#  After cloning this repo, you only need to:
+#    1) put your Cloudflare account_id below (or set CLOUDFLARE_ACCOUNT_ID env)
+#    2) create the KV namespace once:
+#         wrangler kv namespace create BASIRA_KV
+#       and paste the returned id below
+#    3) `wrangler deploy`
+#
+#  Browser Rendering / Browser Run is enabled per-account in the
+#  Cloudflare dashboard ("Browser Rendering" → "Enable").
+
+name = "basira-scraper-worker"
+main = "src/index.js"
+compatibility_date = "2025-09-15"
+compatibility_flags = ["nodejs_compat"]
+workers_dev = true
+
+# ── Browser Rendering / Browser Run binding ───────────────────
+# This is the binding the user spec asked for explicitly.
+# Inside the Worker, env.MYBROWSER is the binding consumed by
+# @cloudflare/playwright's launch() / chromium.launch().
+[browser]
+binding = "MYBROWSER"
+
+# ── KV namespace for history + scraped results ────────────────
+# Create with:   wrangler kv namespace create BASIRA_KV
+# Then replace the placeholder id below with the returned one.
+[[kv_namespaces]]
+binding = "BASIRA_KV"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+# ── Variables ─────────────────────────────────────────────────
+# ALLOWED_ORIGIN is used by the CORS helper. Set it to the URL
+# of your Cloudflare Pages site after the first deploy, or keep
+# "*" while you're still testing.
+[vars]
+ALLOWED_ORIGIN = "*"
+MAX_ROWS_HARD_CAP = "5000"
+
+# ── Optional: limit observability noise ───────────────────────
+[observability]
+enabled = true

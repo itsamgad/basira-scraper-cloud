@@ -1,0 +1,13 @@
+{
+  "name": "basira-scraper-pages",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Basira Scraper — Cloudflare Pages frontend (static HTML + ES modules, no build step).",
+  "scripts": {
+    "build": "echo 'No build step — Cloudflare Pages serves /pages directly.'",
+    "dev":   "echo 'No dev server. Use any static server, e.g.: npx serve .'"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

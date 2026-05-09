@@ -1,0 +1,60 @@
+<!--
+  ╭──────────────────────────────────────────────────────────────╮
+  │  Basira "Web Scraping" Button — drop-in snippet              │
+  │                                                              │
+  │  Paste this into your local Basira app wherever you want the │
+  │  button to appear. It opens your Cloudflare Pages deployment │
+  │  in a new tab — nothing runs locally.                        │
+  │                                                              │
+  │  STEP 1.  Replace BASIRA_PAGES_URL below with your Pages URL │
+  │           (e.g. https://basira-scraper.pages.dev).           │
+  │  STEP 2.  Optional: change `lang` to "en" or "ar".           │
+  │  STEP 3.  Optional: pre-fill a URL with the `url` param so   │
+  │           Basira opens straight on the scraper screen.       │
+  ╰──────────────────────────────────────────────────────────────╯
+-->
+
+<button id="basira-web-scraping-btn"
+        type="button"
+        onclick="openBasiraScraping()"
+        style="
+          display:inline-flex;align-items:center;gap:10px;
+          padding:12px 22px;border:none;border-radius:12px;
+          background:linear-gradient(135deg,#6366f1,#8b5cf6);
+          color:#fff;font-weight:700;font-size:14px;cursor:pointer;
+          box-shadow:0 6px 20px rgba(99,102,241,.35);
+          transition:transform .15s ease, box-shadow .15s ease;
+        "
+        onmouseover="this.style.transform='translateY(-1px)';this.style.boxShadow='0 8px 24px rgba(99,102,241,.45)'"
+        onmouseout="this.style.transform='translateY(0)';this.style.boxShadow='0 6px 20px rgba(99,102,241,.35)'">
+  🌐 <span>Web Scraping</span>
+</button>
+
+<script>
+  // ── Configure once ─────────────────────────────────────────
+  // Replace this with your Cloudflare Pages URL, e.g.
+  //   https://basira-scraper.pages.dev
+  const BASIRA_PAGES_URL = "https://YOUR-PAGES-PROJECT.pages.dev";
+
+  // Optional defaults — they're just URL params, the user can still
+  // change everything in the UI after the page opens.
+  const BASIRA_DEFAULTS = {
+    lang:    "ar",       // "ar" | "en"
+    theme:   "dark",     // "dark" | "light"
+    stealth: "0",        // "0" | "1"
+    rowLimit:"",         // "" or a number
+    // url:  "https://example.com",  // pre-fill the URL field
+    // autostart: "1",               // skip the home screen
+  };
+
+  function openBasiraScraping(overrides = {}) {
+    const params = new URLSearchParams({ ...BASIRA_DEFAULTS, ...overrides });
+    const target = BASIRA_PAGES_URL.replace(/\/+$/, "") + "/?" + params.toString();
+    // Open in a new tab so the local Basira app keeps running.
+    window.open(target, "_blank", "noopener,noreferrer");
+  }
+
+  // Expose for callers that want to pass a URL programmatically:
+  //   openBasiraScraping({ url: "https://amazon.sa/...", autostart: "1" })
+  window.openBasiraScraping = openBasiraScraping;
+</script>
