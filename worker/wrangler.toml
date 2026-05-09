@@ -1,0 +1,29 @@
+# ╭─────────────────────────────────────────────────────────────╮
+# │  Basira Scraper Worker — wrangler config                     │
+# ╰─────────────────────────────────────────────────────────────╯
+#
+# This Worker is the *backend* — it has the Browser Rendering binding
+# that Pages Functions can't have. Pages calls into it via Service
+# Binding (configured in the Pages dashboard, not here).
+
+name = "basira-scraper-worker"
+main = "src/index.js"
+compatibility_date = "2025-09-15"
+compatibility_flags = ["nodejs_compat"]
+
+# ── Browser Rendering binding ─────────────────────────────
+# This is what @cloudflare/playwright reads when you call
+# `launch(env.MYBROWSER)` in scrape.js.
+[browser]
+binding = "MYBROWSER"
+
+# ── KV namespace for history + per-job results + progress ──
+# Run once:  npx wrangler kv namespace create BASIRA_KV
+# then paste the returned id below.
+[[kv_namespaces]]
+binding = "BASIRA_KV"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+[vars]
+ALLOWED_ORIGIN   = "*"
+MAX_ROWS_HARD_CAP = "5000"

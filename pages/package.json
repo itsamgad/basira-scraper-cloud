@@ -1,11 +1,8 @@
 {
-  "name": "basira-scraper",
-  "version": "2.0.0",
+  "name": "basira-scraper-pages",
+  "version": "2.1.0",
   "private": true,
-  "description": "Basira Scraper — Cloudflare Pages + Pages Functions (Browser Rendering).",
-  "dependencies": {
-    "@cloudflare/playwright": "^1.3.0"
-  },
+  "description": "Basira Scraper — frontend on Cloudflare Pages, calls the worker via Service Binding.",
   "engines": {
     "node": ">=18"
   }

@@ -1,57 +1,77 @@
-# Basira Scraper — Cloud Edition (v2)
+# Basira Scraper — Cloud Edition (v2.1)
 
-> **GitHub → Cloudflare Pages.** One project, one deploy, one domain.
-> No separate Worker. No URL configuration. No CORS setup.
+> **Same domain. No URL paste. No CORS.**
+> Pages handles the frontend. A Worker handles Browser Rendering.
+> They talk via **Service Binding** — internal, no URL configuration.
 
-This version moves the entire backend (the Playwright scraper, the
-proxy that injects the overlay, history, and per-job results) into
-**Cloudflare Pages Functions** — code that ships alongside the static
-frontend and runs on the same domain. The frontend just calls
-`/api/scrape` and `/proxy?url=…` like any normal web app.
+```
+┌────────────────────┐     fetch('/api/scrape')     ┌──────────────────────┐
+│   Browser          │ ───────────────────────────► │  Pages Function      │
+│  basira.pages.dev  │      (same origin)           │  (forwarder, 1 line) │
+└────────────────────┘                              └──────────┬───────────┘
+                                                               │ env.BACKEND.fetch()
+                                                               │ (Service Binding,
+                                                               │  internal RPC,
+                                                               │  no URL, no CORS)
+                                                               ▼
+                                                    ┌──────────────────────┐
+                                                    │   Worker             │
+                                                    │   *.workers.dev      │
+                                                    │  ┌────────────────┐  │
+                                                    │  │ Browser        │  │
+                                                    │  │ Rendering      │  │
+                                                    │  └────────────────┘  │
+                                                    └──────────────────────┘
+```
+
+## Why this layout
+
+Pages Functions cannot bind to **Browser Rendering** — only Workers can.
+But Pages Functions *can* bind to a Worker via Service Binding. So:
+
+- The **Worker** holds Browser Rendering. It does the scraping.
+- The **Pages site** holds the frontend, plus tiny Pages Functions
+  that forward requests to the Worker via Service Binding.
+- The frontend uses **relative paths** (`/api/scrape`, `/proxy?...`).
+- Cloudflare routes those internally — never crosses CORS, never
+  needs a hardcoded Worker URL anywhere.
+
+## Folder layout
 
 ```
 basira-scraper-cloud/
-├── wrangler.toml                ← Pages config + bindings
-├── README.md
-├── basira-button/               ← drop-in for your local app
+├── README.md                  ← this file
+├── basira-button/             ← drop-in for your local app
 └── pages/
-    ├── package.json             ← @cloudflare/playwright dep
     ├── _headers
     ├── basira-logo.png
-    ├── index.html               ← single-page flow: home → modal → results
+    ├── package.json           ← no deps; Pages serves files as-is
+    ├── index.html             ← single-page flow: home → modal → results
     ├── scraper.html
     ├── view.html
     ├── assets/
-    │   ├── app.js               ← uses relative paths (/api/…, /proxy?…)
+    │   ├── app.js             ← uses /api/… and /proxy?… (no URL config)
     │   ├── styles.css
     │   ├── i18n.js
     │   ├── scraper-page.js
     │   └── view-page.js
-    └── functions/               ← backend code (Pages auto-routes by path)
-        ├── proxy.js             → /proxy
-        ├── api/
-        │   ├── scrape.js        → /api/scrape
-        │   ├── history.js       → /api/history
-        │   └── results.js       → /api/results
-        └── _lib/                ← helpers (underscore = not routed)
-            ├── cors.js
-            ├── overlay-injector-string.js
-            ├── results-helpers.js
-            └── history-helpers.js
+    └── functions/             ← Pages Functions (auto-routed)
+        ├── proxy.js                ← /proxy → BACKEND.fetch()
+        └── api/[[path]].js         ← /api/* → BACKEND.fetch()
+└── worker/
+    ├── package.json           ← @cloudflare/playwright
+    ├── wrangler.toml          ← [browser] binding lives here
+    └── src/
+        ├── index.js           ← router
+        ├── proxy.js           ← reverse-proxy + overlay injection
+        ├── scrape.js          ← Playwright on Browser Rendering
+        ├── history.js
+        ├── results.js
+        ├── cors.js
+        ├── _history-helpers.js
+        ├── _results-helpers.js
+        └── overlay-injector-string.js
 ```
-
----
-
-## Why this is better than the v1 (separate Worker) layout
-
-| | v1 (Worker + Pages) | v2 (Pages Functions) |
-|---|---|---|
-| Deployments | 2 (Worker + Pages) | **1** (Pages) |
-| Domains | 2 (`workers.dev` + `pages.dev`) | **1** (`pages.dev`) |
-| URL config in code | required (`config.js`) | **none — relative paths** |
-| CORS setup | required | **none — same origin** |
-| Bindings | declared in 2 places | declared in **1** place |
-| Browser popup blocker risk | possible (new tab) | **none** (in-page modal) |
 
 ---
 
@@ -61,135 +81,145 @@ basira-scraper-cloud/
 
 - A Cloudflare account (free tier works).
 - A GitHub account.
-- **Browser Rendering** enabled in your Cloudflare dashboard:
-  Compute → Browser Run → enable.
+- **Browser Run** enabled in your Cloudflare dashboard
+  (Compute → Browser Run → Enable). One-time per account.
 
-### 1. Create the KV namespace (one-time)
+### 1. Push the code to GitHub
 
-In the Cloudflare dashboard:
+In GitHub Desktop: replace the contents of your repo with this folder
+(the four entries: `README.md`, `basira-button/`, `pages/`, `worker/`).
+Commit + Push.
 
-1. **Storage & Databases → KV → Create a namespace.**
-2. Name: `BASIRA_KV`
-3. Copy the namespace **id** that's returned.
-4. Open `wrangler.toml` (in this repo) and paste the id:
-   ```toml
-   [[kv_namespaces]]
-   binding = "BASIRA_KV"
-   id = "<paste-it-here>"
-   ```
+### 2. Create the KV namespace (one-time)
 
-### 2. Push to GitHub
+Cloudflare Dashboard → Storage & Databases → KV → **Create**.
 
-```bash
-git add .
-git commit -m "Basira Scraper v2 — Pages Functions"
-git push
-```
+- Name: `BASIRA_KV`
+- Copy the returned **id**.
 
-### 3. Connect to Cloudflare Pages
+Open `worker/wrangler.toml` on GitHub, replace `REPLACE_WITH_YOUR_KV_NAMESPACE_ID`
+with that id, commit.
 
-1. **Workers & Pages → Create → Pages → Connect to Git.**
-2. Pick this repo.
-3. Build settings:
-   - **Framework preset**: None
-   - **Build command**: *(leave empty)*
-   - **Build output directory**: `pages`
-   - **Root directory**: *(leave empty — repo root)*
-4. **Save and Deploy.**
+> If you already had `BASIRA_KV` for the previous worker, reuse the
+> same id — your history won't be lost.
 
-Pages will:
-- Read `wrangler.toml` for compatibility flags and bindings.
-- Run `npm install` inside `pages/` because of the `package.json`.
-- Detect `pages/functions/` and route them automatically.
-- Serve `pages/` as the static site.
+### 3. Deploy the Worker
 
-### 4. Verify the bindings (one-time, in dashboard)
+Cloudflare Dashboard → Workers & Pages → **Create** → Workers tab →
+**Import a repository**.
 
-After the first deploy, go to your Pages project:
+- Repo: your `basira-scraper-cloud` repo
+- **Root directory**: `worker`   ← important
+- **Build command**: empty
+- **Deploy command**: `npx wrangler deploy`
 
-**Settings → Functions → Bindings.** You should see:
+Click Save and Deploy. The Worker URL will look like:
+`https://basira-scraper-worker.<your-account>.workers.dev`
 
-- ✅ `MYBROWSER` (Browser Rendering)
+Verify in **Settings → Bindings**:
+- ✅ `MYBROWSER` (Browser Rendering)  ← added automatically by wrangler.toml
 - ✅ `BASIRA_KV` (KV namespace)
 
-If either is missing, add it manually with the same name (the
-`wrangler.toml` should populate them automatically, but the dashboard
-overrides everything and is the source of truth).
+### 4. Deploy the Pages site
 
-### 5. Done
+Cloudflare Dashboard → Workers & Pages → **Create** → Pages tab →
+**Connect to Git**.
 
-Open the URL Pages gives you (`https://basira-scraper.pages.dev` or
-similar). Paste a URL. Click Start. The full flow works in **one
-browser tab**, no popups, no manual config.
+- Same repo
+- **Build output directory**: `pages`
+- **Build command**: empty
+- **Framework preset**: None
+
+Click Save and Deploy. Pages URL: `https://basira-scraper.pages.dev`.
+
+### 5. Connect Pages → Worker via Service Binding ⭐
+
+This is the step that eliminates the URL config:
+
+1. Open the Pages project → **Settings → Functions → Bindings**.
+2. Click **Add → Service binding**.
+3. **Variable name**: `BACKEND`   ← exact name, case-sensitive
+4. **Service**: select `basira-scraper-worker`.
+5. **Save**.
+
+Trigger a redeploy (Deployments → latest → **Retry**).
+
+### 6. Done — test it
+
+Open the Pages URL. Paste `https://books.toscrape.com/`. Click Start.
+
+- An in-page modal pops up with the books site loaded inside.
+- Sidebar overlay floats on the right.
+- Click a book card → SHIFT+click on title/price/image.
+- Pick auto-scroll → press Extract.
+- Results appear in a table.
+
+If anything goes wrong, the most common failure is the Service
+Binding not being attached. The forwarder Functions return a clear
+error message in that case.
 
 ---
 
-## Testing checklist
+## The flow at runtime
 
-After your first deploy:
+```
+Browser:  fetch('/api/scrape', {body:...})
+           ↓
+Pages Function api/[[path]].js  →  env.BACKEND.fetch(request)
+           ↓ (internal Cloudflare RPC, no DNS, no TLS, no CORS)
+Worker /api/scrape  →  launch(env.MYBROWSER)  →  Playwright on Browser Rendering
+           ↑
+Browser:  receives JSON response
+```
 
-1. Open `https://<your-project>.pages.dev`
-2. Paste `https://books.toscrape.com/`
-3. Click Start
-4. **Expected:** an in-page modal pops up with the books site loaded
-   inside, sidebar overlay on the right.
-5. Click a book card → SHIFT+Click on title, price, image
-6. Pick Auto-scroll → press Extract
-7. Modal closes → "Page 1 · 5 items collected" → results table
-8. Try `View` on the history entry — past results page should load
-9. Try the Basira button (`basira-button/basira-scraping-button.html`)
-   pointing at this Pages URL — it should pre-fill and auto-start.
+The frontend *never* knows the Worker's URL. Service Binding is an
+in-memory reference — Cloudflare wires it up when both deployments
+exist.
 
 ---
 
-## How it differs from the original local app
+## Why not put everything in the Worker?
 
-The original opened a **visible Chromium window** on the user's
-machine with Playwright (`headless: false, --start-maximized`).
-Cloudflare Browser Rendering is headless-only — there is no display
-on the server side. The closest equivalent on Cloudflare is:
+We could — Workers can serve static assets too. But Pages gives us:
 
-- The frontend pops up an in-page modal containing an iframe.
-- The iframe loads `/proxy?url=…`, which is a Pages Function that
-  fetches the target site server-side, strips `X-Frame-Options`/CSP,
-  rewrites common JS frame-busting patterns, and injects the same
-  sidebar overlay the original local app used.
-- The user clicks elements inside the iframe just like before.
-- The overlay sends the selection back to the parent page via
-  `postMessage`.
-- The parent calls `/api/scrape` (Pages Function), which runs the
-  *real* scrape on Browser Rendering and returns the results.
+- Automatic git-driven deploys
+- Preview deployments per branch / PR
+- A real CDN with `_headers` and `_redirects` files
+- Faster startup for static files
 
-Auto-scroll, pagination, load-more, stealth UA rotation, retry logic,
-star-rating extraction, CSV/JSON export, history — all ported from
-the original.
+So splitting frontend (Pages) from backend (Worker) is genuinely
+better for this app. Service Bindings let us split without paying
+the usual cost (CORS, URL config).
 
 ---
 
 ## Cost
 
-Cloudflare's free tier covers a generous amount of this. Browser
-Rendering and KV both have free quotas. Pages Functions count against
-the Workers free tier (100k requests/day on the free plan).
+Free tier covers a generous amount of all four services:
+- Pages: unlimited static requests
+- Pages Functions: 100k requests/day
+- Workers: 100k requests/day
+- Browser Rendering: 10 minutes/day on the free Workers plan
+- KV: 100k reads/day, 1k writes/day
+
+The Service Binding call between Pages Function and Worker counts as
+one request to each. So a single user-triggered scrape uses one Pages
+Function request and one Worker request.
 
 ---
 
 ## Troubleshooting
 
-**The modal opens but the page inside is blank.** The site has very
+**`Service binding 'BACKEND' is not configured`** — step 5 above
+wasn't done. Add the binding and redeploy Pages.
+
+**`MYBROWSER is not defined`** in Worker logs — Browser Rendering
+isn't enabled, or the binding wasn't applied. Check your Worker's
+**Settings → Bindings**.
+
+**Modal opens but the page is blank** — the target site has very
 strict framing detection. After 7 seconds the modal shows a "Switch
-to manual mode" button — click it and paste CSS selectors directly.
+to manual mode" button. Use it.
 
-**Scrape fails with "MYBROWSER is not defined".** Browser Rendering
-isn't bound to the Pages project. Go to **Settings → Functions →
-Bindings → Add → Browser Rendering**, name it `MYBROWSER`.
-
-**Scrape fails with KV errors.** The KV id in `wrangler.toml` doesn't
-match a real namespace, or the binding `BASIRA_KV` isn't attached in
-the Pages dashboard. Check both.
-
-**The page stays on the home screen after Start.** Open DevTools →
-Network. The `POST /api/scrape` request should return 200. If you
-see 404, Functions aren't being detected — make sure your build
-output directory is `pages` and the functions live under
-`pages/functions/`.
+**`KV namespace not found`** — the id in `worker/wrangler.toml`
+doesn't match a real namespace. Re-read step 2.

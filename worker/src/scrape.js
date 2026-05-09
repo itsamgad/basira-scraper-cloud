@@ -1,13 +1,12 @@
-// Pages Function — handles POST /api/scrape
-// Runs Playwright on Cloudflare Browser Rendering (binding = MYBROWSER)
-// configured in the Pages project's Functions → Bindings dashboard.
-//
-// Body: { url, jobId, selection: {...}, rowLimit?, stealth?, lang? }
+// Worker scrape handler — runs Playwright on Browser Rendering
+// (binding = MYBROWSER, declared in worker/wrangler.toml).
+// Called via Service Binding from Pages, or directly via the
+// Worker's *.workers.dev URL.
 
 import { launch } from "@cloudflare/playwright";
-import { jsonResponse, errorResponse, preflightResponse } from "../_lib/cors.js";
-import { saveResult, saveProgress } from "../_lib/results-helpers.js";
-import { addHistoryEntry } from "../_lib/history-helpers.js";
+import { jsonResponse, errorResponse, preflightResponse } from "./cors.js";
+import { saveResult, saveProgress } from "./_results-helpers.js";
+import { addHistoryEntry } from "./_history-helpers.js";
 
 const USER_AGENTS = [
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
@@ -23,14 +22,13 @@ const USER_AGENTS = [
 ];
 const randomUA = () => USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 
-export async function onRequestOptions() { return preflightResponse(); }
-
-export async function onRequestPost(context) {
-  const { request, env } = context;
+export async function handleScrape(request, env) {
+  if (request.method === "OPTIONS") return preflightResponse(env);
+  if (request.method !== "POST") return errorResponse("Method not allowed", env, 405);
 
   let body;
   try { body = await request.json(); }
-  catch (e) { return errorResponse("Invalid JSON body", 400); }
+  catch (e) { return errorResponse("Invalid JSON body", env, 400); }
 
   const {
     url,
@@ -42,7 +40,7 @@ export async function onRequestPost(context) {
   } = body || {};
 
   if (!url || !selection || !selection.parentSelector || !selection.itemSelector || !Array.isArray(selection.fields)) {
-    return errorResponse("Missing: url, selection.parentSelector, selection.itemSelector, selection.fields", 400);
+    return errorResponse("Missing: url, selection.parentSelector, selection.itemSelector, selection.fields", env, 400);
   }
 
   const hardCap = parseInt(env.MAX_ROWS_HARD_CAP || "5000", 10);
@@ -162,7 +160,7 @@ export async function onRequestPost(context) {
       success: true, jobId,
       itemsScraped: validItemIndex,
       failedItems, fields, data, duration,
-    });
+    }, env);
   } catch (error) {
     console.error("Scrape error:", error);
     if (browser) { try { await browser.close(); } catch (_) {} }
@@ -171,7 +169,7 @@ export async function onRequestPost(context) {
         status: "error", error: error.message || "Scrape failed",
       });
     }
-    return errorResponse(error.message || "Scrape failed", 500);
+    return errorResponse(error.message || "Scrape failed", env, 500);
   }
 }
 
