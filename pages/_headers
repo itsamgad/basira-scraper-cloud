@@ -1,0 +1,25 @@
+# Cloudflare Pages headers config.
+# https://developers.cloudflare.com/pages/configuration/headers/
+
+# Long-cache static assets (filenames don't change often, but you can
+# bust the cache by editing them — Pages will redeploy on every push).
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+  Access-Control-Allow-Origin: *
+
+/basira-logo.png
+  Cache-Control: public, max-age=86400
+
+# HTML pages must always be fresh, otherwise users could be stuck on
+# an old build pointing at an old Worker URL.
+/*.html
+  Cache-Control: no-cache, no-store, must-revalidate
+
+/
+  Cache-Control: no-cache, no-store, must-revalidate
+
+# Decent defaults for the whole site.
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer-when-downgrade
+  Permissions-Policy: interest-cohort=()
