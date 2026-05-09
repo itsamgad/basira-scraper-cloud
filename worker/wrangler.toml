@@ -22,7 +22,7 @@ binding = "MYBROWSER"
 # then paste the returned id below.
 [[kv_namespaces]]
 binding = "BASIRA_KV"
-id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+id = "7405e5d465284b7eaa7c30ce0393406e"
 
 [vars]
 ALLOWED_ORIGIN   = "*"
