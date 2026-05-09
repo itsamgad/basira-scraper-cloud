@@ -8,6 +8,7 @@
   <link rel="stylesheet" href="/assets/styles.css" />
 </head>
 <body>
+  <!-- Top nav -->
   <nav class="bs-nav">
     <div style="display:flex;align-items:center;gap:10px">
       <img src="/basira-logo.png" style="width:32px;height:32px;object-fit:contain" alt="logo"/>
@@ -22,15 +23,11 @@
     </div>
   </nav>
 
-  <!-- ──── Visual selection workspace (iframe) ────────────── -->
-  <div id="select-screen" class="bs-iframe-wrap" hidden>
-    <div class="bs-iframe-toolbar">
-      <span style="font-size:.78rem">🌐</span>
-      <div class="bs-iframe-url" id="iframe-url"></div>
-      <span id="iframe-note" style="color:var(--warning);font-size:.74rem"></span>
-    </div>
-    <iframe id="selection-iframe" class="bs-iframe" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
-  </div>
+  <!-- Visual selection no longer happens in this page. The home page    -->
+  <!-- opens the worker /proxy URL directly in a new tab — the user      -->
+  <!-- sees the actual target site filling the window with the sidebar   -->
+  <!-- overlay. After they click Extract, the overlay redirects them     -->
+  <!-- back here with ?autorun=1&selection=… and the scrape runs.        -->
 
   <!-- ──── Manual selectors workspace ─────────────────────── -->
   <div id="manual-screen" class="bs-page" hidden>

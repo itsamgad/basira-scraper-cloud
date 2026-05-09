@@ -17,7 +17,7 @@ const state = {
   jobId:   params.get("jobId") || ("job-" + Date.now()),
   lang:    params.get("lang") || localStorage.getItem("basira.lang") || "en",
   theme:   params.get("theme") || localStorage.getItem("basira.theme") || "dark",
-  mode:    params.get("mode") || "visual",
+  mode:    params.get("mode") || "visual",   // visual is the default — manual is a fallback
   stealth: params.get("stealth") === "1",
   rowLimit: parseInt(params.get("rowLimit") || "0", 10) || null,
   data:    [],
@@ -40,7 +40,7 @@ $("back-btn").onclick   = () => window.location.href = "/";
 
 // ── view switching ───────────────────────────────────────────
 function show(view) {
-  for (const id of ["select-screen", "manual-screen", "loading-screen", "error-screen", "results-screen"]) {
+  for (const id of ["manual-screen", "loading-screen", "error-screen", "results-screen"]) {
     $(id).hidden = id !== view;
   }
 }
@@ -48,38 +48,29 @@ function show(view) {
 // ── kick off the right view ──────────────────────────────────
 if (!state.url) {
   showError("No URL provided. Go back and enter a URL.");
+} else if (params.get("autorun") === "1" && params.get("selection")) {
+  // Coming back from the proxied page: the overlay redirected us here
+  // with the user's selection encoded in the URL. Decode and run.
+  try {
+    const selection = JSON.parse(decodeURIComponent(params.get("selection")));
+    runScrape(selection);
+  } catch (e) {
+    showError("Could not parse selection: " + e.message);
+  }
 } else if (state.mode === "manual") {
   startManual();
 } else {
-  startVisual();
+  // Fallback: someone landed here directly without going through the
+  // proxy (e.g. opened scraper.html in a tab manually). Offer manual.
+  startManual();
 }
 
 // ╭──────────────────────────────────────────────────────────╮
-// │  Visual selection via iframe + postMessage               │
+// │  (Visual selection now happens on the worker proxy URL,  │
+// │   not in an iframe inside this page. After the user      │
+// │   clicks Extract, the overlay redirects back here with   │
+// │   ?selection=…&autorun=1 — handled at the top of file.)  │
 // ╰──────────────────────────────────────────────────────────╯
-function startVisual() {
-  $("iframe-url").textContent = state.url;
-  $("iframe-note").textContent = t.iframeNote;
-  show("select-screen");
-
-  const iframe = $("selection-iframe");
-  iframe.src = `${WORKER_URL}/proxy?url=${encodeURIComponent(state.url)}`;
-
-  // listen for the selection coming back from the iframe
-  window.addEventListener("message", onIframeMessage, false);
-}
-
-function onIframeMessage(ev) {
-  if (!ev.data || ev.data.basira !== true) return;
-  if (ev.data.type === "cancelled") {
-    window.location.href = "/";
-    return;
-  }
-  if (ev.data.type === "selection") {
-    window.removeEventListener("message", onIframeMessage, false);
-    runScrape(ev.data.payload);
-  }
-}
 
 // ╭──────────────────────────────────────────────────────────╮
 // │  Manual selectors workspace                               │

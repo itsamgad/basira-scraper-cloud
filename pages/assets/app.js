@@ -13,7 +13,6 @@ const state = {
   lang:    localStorage.getItem("basira.lang")    || "en",
   theme:   localStorage.getItem("basira.theme")   || "dark",
   stealth: localStorage.getItem("basira.stealth") === "1",
-  mode:    localStorage.getItem("basira.mode")    || "visual",
 };
 
 // ── apply theme + lang ───────────────────────────────────────
@@ -30,10 +29,6 @@ function applyChrome() {
   $("advanced-label").textContent = t.advanced;
   $("stealth-label").textContent  = t.stealth;
   $("stealth-desc").textContent   = t.stealthDesc;
-  $("mode-label").textContent     = t.visualMode;
-  $("mode-desc").textContent      = state.lang === "en"
-    ? "Visual selection (recommended) or paste CSS selectors"
-    : "تحديد بصري (مفضّل) أو الصق محدِّدات CSS مباشرة";
   $("history-label").textContent  = t.history;
   $("f1").textContent = t.f1; $("f2").textContent = t.f2;
   $("f3").textContent = t.f3; $("f4").textContent = t.f4;
@@ -52,7 +47,6 @@ function applyChrome() {
     tog.firstElementChild.style.left = "3px";
     $("stealth-row").classList.remove("active");
   }
-  $("mode-select").value = state.mode;
 }
 
 applyChrome();
@@ -73,10 +67,6 @@ $("stealth-toggle").onclick = () => {
   state.stealth = !state.stealth;
   localStorage.setItem("basira.stealth", state.stealth ? "1" : "0");
   applyChrome();
-};
-$("mode-select").onchange = () => {
-  state.mode = $("mode-select").value;
-  localStorage.setItem("basira.mode", state.mode);
 };
 $("advanced-toggle").onclick = () => {
   const p = $("advanced-panel");
@@ -110,17 +100,24 @@ function handleStart() {
   if (!/^https?:\/\//i.test(raw)) raw = "https://" + raw;
 
   const jobId = "job-" + Date.now();
+
+  // Open the WORKER /proxy endpoint directly in a new tab. The proxy
+  // serves the actual target site (with the overlay sidebar injected
+  // by the worker), so the user sees the real website filling the
+  // window — exactly like the original Chromium maximized window.
+  // After they pick elements + click Extract, the overlay script
+  // navigates the same tab back to /scraper.html?...selection=...
+  // where the worker runs the actual scrape and shows the results.
   const params = new URLSearchParams({
-    url:     raw,
+    url:      raw,
     jobId,
-    lang:    state.lang,
-    theme:   state.theme,
-    mode:    state.mode,
-    stealth: state.stealth ? "1" : "0",
+    lang:     state.lang,
+    stealth:  state.stealth ? "1" : "0",
+    pagesUrl: window.location.origin,
   });
   if (rowLimit) params.set("rowLimit", rowLimit);
 
-  window.location.href = "/scraper.html?" + params.toString();
+  window.open(`${WORKER_URL}/proxy?` + params.toString(), "_blank", "noopener");
 }
 
 // ── history ──────────────────────────────────────────────────
