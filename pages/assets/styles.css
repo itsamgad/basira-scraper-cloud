@@ -230,7 +230,34 @@ select.bs-input{cursor:pointer;}
 /* Empty state */
 .bs-empty{padding:40px;text-align:center;color:var(--text-muted);font-size:.86rem;}
 
-/* Iframe selection workspace */
+/* ── Modal (full-screen iframe pop-over inside the same page) ── */
+/* Sits on top of the home page, fills the viewport. The iframe   */
+/* gets the entire body of the modal; the worker proxy injects    */
+/* the sidebar overlay inside it.                                 */
+.bs-modal{
+  position:fixed;inset:0;z-index:9000;display:flex;flex-direction:column;
+  background:#000;
+}
+.bs-modal-header{
+  flex-shrink:0;display:flex;align-items:center;justify-content:space-between;
+  gap:12px;padding:10px 16px;background:#0f172a;color:#f1f5f9;
+  border-bottom:1px solid rgba(255,255,255,.08);min-width:0;
+}
+.bs-modal-body{
+  flex:1;position:relative;background:#fff;
+}
+.bs-modal-body iframe{
+  position:absolute;inset:0;width:100%;height:100%;border:none;background:#fff;
+}
+.bs-modal-blank-hint{
+  position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  box-shadow:var(--shadow-lg);padding:24px 26px;width:340px;z-index:10;
+}
+/* Hide the home-page chrome behind the modal so it can't be tabbed into */
+body.bs-modal-open #home-section{visibility:hidden;}
+
+/* Iframe selection workspace (legacy, used when a toolbar IS desired) */
 .bs-iframe-wrap{
   flex:1;display:flex;flex-direction:column;height:calc(100vh - 64px);
   background:var(--surface-2);position:relative;
@@ -246,6 +273,24 @@ select.bs-input{cursor:pointer;}
   border:1px solid var(--border);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
 }
 .bs-iframe{flex:1;border:none;width:100%;background:#fff;}
+
+/* Full-screen iframe — mirrors the original maximized Chromium window. */
+/* The sidebar overlay (injected by the worker proxy) floats on the right */
+/* INSIDE the iframe just like it did in the local Chromium window.       */
+.bs-iframe-fullscreen{
+  position:fixed;inset:0;background:#fff;z-index:1;
+}
+.bs-iframe-full{
+  position:absolute;inset:0;width:100%;height:100%;border:none;background:#fff;
+}
+.bs-iframe-blank-hint{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  background:var(--surface);border:1px solid var(--border);border-radius:14px;
+  box-shadow:var(--shadow-lg);padding:22px 24px;width:320px;z-index:10;
+}
+/* When the visual selection screen is showing, hide the top nav so the */
+/* target site has the entire viewport (just like the original).        */
+body.bs-iframe-mode .bs-nav{display:none;}
 
 /* Manual mode panel */
 .bs-manual-panel{

@@ -44,9 +44,9 @@ export const overlayScript = String.raw`
   var pickingMode        = null; // 'pagination' | 'load-more' | null
 
   // ── helpers ─────────────────────────────────────────────────
-  // Port of the original `isStableClass` from src/utils/overlay-injector.js.
-  // Filters out Tailwind utilities, arbitrary-value classes (`text-[15px]`),
-  // CSS-module hex hashes (`a3f2c1`), state classes (`active`, `js-*`, …),
+  // Port of the original isStableClass from src/utils/overlay-injector.js.
+  // Filters Tailwind utilities, arbitrary-value classes (text-[15px]),
+  // CSS-module hex hashes (a3f2c1), state classes (active, js-*, ...),
   // and our own panel marker class.
   function isStableClass(cls) {
     if (!cls || cls.length < 2 || cls.length >= 40) return false;
@@ -77,7 +77,7 @@ export const overlayScript = String.raw`
     if (!el || !el.className || typeof el.className !== 'string') return null;
     var classes = el.className.split(/\s+/).filter(isStableClass);
     if (!classes.length) return null;
-    // Prefer BEM-style classes (contain `__` or `--`) — they're component-scoped
+    // Prefer BEM-style classes (contain __ or --) which are component-scoped
     var bem = classes.filter(function(c) { return c.indexOf('__') >= 0 || c.indexOf('--') >= 0; });
     if (bem.length) return bem[0];
     // Otherwise prefer the longest one (most specific)
@@ -207,8 +207,7 @@ export const overlayScript = String.raw`
     );
     document.getElementById('__bs_start').onclick  = startSelection;
     document.getElementById('__bs_cancel').onclick = function() {
-      var ctx = window.__BASIRA__ || {};
-      window.location.href = ctx.pagesUrl || '/';
+      try { window.parent.postMessage({ basira: true, type: 'cancelled' }, '*'); } catch (e) {}
     };
   }
 
@@ -394,19 +393,13 @@ export const overlayScript = String.raw`
     );
 
     try {
-      var ctx = window.__BASIRA__ || {};
-      var qs = new URLSearchParams({
-        jobId:    ctx.jobId    || '',
-        url:      ctx.sourceUrl || '',
-        lang:     ctx.lang     || 'en',
-        stealth:  ctx.stealth  || '0',
-        rowLimit: ctx.rowLimit || '',
-        autorun:  '1',
-        selection: encodeURIComponent(JSON.stringify(result)),
-      });
-      var dest = (ctx.pagesUrl || '') + '/scraper.html?' + qs.toString();
-      // Brief pause so the user sees the "captured" panel for a moment.
-      setTimeout(function() { window.location.href = dest; }, 600);
+      // Send the selection up to the parent page (the home modal).
+      // The home page closes the modal and runs the scrape on the
+      // worker, then shows the results — no navigation, same tab.
+      window.parent.postMessage(
+        { basira: true, type: 'selection', payload: result },
+        '*',
+      );
     } catch (e) {}
   }
 

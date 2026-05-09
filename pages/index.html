@@ -8,27 +8,31 @@
   <link rel="stylesheet" href="/assets/styles.css" />
 </head>
 <body>
-  <!-- Nav -->
+
+  <!-- ═══════════════ TOP NAV (always visible) ═══════════════ -->
   <nav class="bs-nav">
     <div style="display:flex;align-items:center;gap:12px">
       <img src="/basira-logo.png" style="width:36px;height:36px;object-fit:contain" alt="Basira logo" />
       <span class="bs-brand" id="brand">Basira</span>
+      <span id="hostname-badge" style="color:var(--text-muted);font-size:.75rem"></span>
     </div>
     <div class="bs-nav-actions">
+      <button id="export-csv"  class="bs-btn bs-btn-ghost" hidden style="padding:8px 14px;font-size:.8rem;color:var(--success);border-color:rgba(34,197,94,.25);background:rgba(34,197,94,.07)">↓ CSV</button>
+      <button id="export-json" class="bs-btn bs-btn-ghost" hidden style="padding:8px 14px;font-size:.8rem">↓ JSON</button>
+      <button id="new-scrape-btn" class="bs-btn bs-btn-ghost" hidden style="padding:8px 14px;font-size:.8rem">← New scrape</button>
       <button class="bs-icon-btn" id="lang-toggle" style="font-weight:700;font-size:13px;width:auto;padding:0 12px">AR</button>
       <button class="bs-icon-btn" id="theme-toggle">☀️</button>
     </div>
   </nav>
 
-  <main class="bs-page">
-    <!-- Hero -->
+  <!-- ═══════════════ SECTION 1 · HOME ═══════════════ -->
+  <main id="home-section" class="bs-page">
     <div style="text-align:center;padding-top:16px;padding-bottom:8px">
       <img src="/basira-logo.png" style="width:88px;height:88px;object-fit:contain;margin-bottom:16px" alt="Basira logo" />
       <h1 style="font-size:2.2rem;font-weight:800;letter-spacing:-1px;color:var(--accent);font-family:var(--mono);margin-bottom:10px">Basira Scraper</h1>
       <p id="subtitle" style="font-size:.95rem;color:var(--text-dim);max-width:520px;margin:0 auto"></p>
     </div>
 
-    <!-- URL Card -->
     <div class="bs-card" style="max-width:760px;width:100%;margin:0 auto">
       <div style="display:flex;gap:10px">
         <input id="url-input" class="bs-input" type="url" placeholder="https://example.com" style="direction:ltr" />
@@ -42,7 +46,6 @@
       <button id="advanced-toggle" style="background:none;border:none;color:var(--text-dim);cursor:pointer;font-size:.8rem;font-weight:600;padding:8px 0 0;font-family:var(--sans)">▼ <span id="advanced-label">Advanced Options</span></button>
 
       <div id="advanced-panel" class="bs-advanced-panel" hidden>
-        <!-- Stealth -->
         <div id="stealth-row" class="bs-toggle-row">
           <div>
             <div class="bs-toggle-row-label">🥷 <span id="stealth-label">Stealth Mode</span></div>
@@ -52,11 +55,9 @@
             <div class="bs-toggle-thumb" style="left:3px"></div>
           </button>
         </div>
-
       </div>
     </div>
 
-    <!-- Feature cards -->
     <div class="bs-feat-grid" style="max-width:760px;width:100%;margin:0 auto">
       <div class="bs-feat-card"><div class="bs-feat-label">JS</div><div class="bs-feat-desc" id="f1">JS Support</div></div>
       <div class="bs-feat-card"><div class="bs-feat-label">EN/AR</div><div class="bs-feat-desc" id="f2">Bilingual</div></div>
@@ -64,7 +65,6 @@
       <div class="bs-feat-card"><div class="bs-feat-label">⚡</div><div class="bs-feat-desc" id="f4">All Load Methods</div></div>
     </div>
 
-    <!-- History -->
     <div style="max-width:760px;width:100%;margin:0 auto">
       <div class="bs-section-head">
         <span class="bs-section-title">🕐 <span id="history-label">Recent Scrapes</span></span>
@@ -73,6 +73,126 @@
       <div id="history-list"></div>
     </div>
   </main>
+
+  <!-- ═══════════════ SECTION 2 · MODAL (full-screen iframe) ═══════════════ -->
+  <div id="modal-section" class="bs-modal" hidden>
+    <div class="bs-modal-header">
+      <div style="display:flex;align-items:center;gap:10px;min-width:0">
+        <img src="/basira-logo.png" style="width:24px;height:24px;object-fit:contain;flex-shrink:0" alt="logo"/>
+        <span style="font-weight:700;font-size:.85rem">Selecting from</span>
+        <code id="modal-url" style="background:rgba(255,255,255,.08);padding:4px 10px;border-radius:6px;font-size:.75rem;font-family:var(--mono);direction:ltr;overflow:hidden;text-overflow:ellipsis;white-space:nowrap"></code>
+      </div>
+      <button id="modal-close" class="bs-btn bs-btn-ghost" style="padding:6px 14px;font-size:.78rem">✕ Cancel</button>
+    </div>
+    <div class="bs-modal-body">
+      <iframe id="modal-iframe" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
+      <div id="modal-blank-hint" class="bs-modal-blank-hint" hidden>
+        <div style="font-size:1rem;font-weight:700;margin-bottom:8px">⚠️ <span id="hint-title">This site blocks framing</span></div>
+        <div style="font-size:.85rem;color:var(--text-dim);margin-bottom:14px" id="hint-desc"></div>
+        <div style="display:flex;gap:8px">
+          <button id="hint-manual" class="bs-btn bs-btn-primary" style="flex:1;font-size:.85rem">Switch to manual mode</button>
+          <button id="hint-cancel" class="bs-btn bs-btn-ghost" style="font-size:.85rem">Cancel</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SECTION 3 · MANUAL FALLBACK ═══════════════ -->
+  <div id="manual-section" class="bs-page" hidden>
+    <div class="bs-card" style="max-width:760px;width:100%;margin:0 auto">
+      <div class="bs-section-head">
+        <span class="bs-section-title">✋ <span id="manual-title">Manual selectors</span></span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:10px">
+        <label style="font-size:.74rem;color:var(--text-dim)" id="lbl-parent">List container selector</label>
+        <input id="m-parent" class="bs-input" placeholder=".product-list" />
+
+        <label style="font-size:.74rem;color:var(--text-dim);margin-top:8px" id="lbl-item">Item selector</label>
+        <input id="m-item" class="bs-input" placeholder=".product-card" />
+
+        <label style="font-size:.74rem;color:var(--text-dim);margin-top:8px" id="lbl-fields-m">Fields</label>
+        <div id="m-fields"></div>
+        <button id="m-add-field" class="bs-btn bs-btn-ghost" style="align-self:flex-start" type="button">+ <span id="lbl-add">Add field</span></button>
+
+        <label style="font-size:.74rem;color:var(--text-dim);margin-top:8px">Loading method</label>
+        <select id="m-method" class="bs-input">
+          <option value="auto-scroll">↕ Auto-scroll</option>
+          <option value="pagination">📄 Pagination</option>
+          <option value="load-more">➕ Load more</option>
+        </select>
+
+        <div id="m-extra-row" hidden>
+          <label id="lbl-extra" style="font-size:.74rem;color:var(--text-dim);margin-top:8px"></label>
+          <input id="m-extra" class="bs-input" placeholder=".pagination .next" />
+        </div>
+
+        <div style="display:flex;gap:10px;margin-top:14px">
+          <button id="m-cancel" class="bs-btn bs-btn-ghost" style="flex:0">← Back</button>
+          <button id="m-run" class="bs-btn bs-btn-primary" style="flex:1"><span id="lbl-run">⚡ Run scrape</span></button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SECTION 4 · PROGRESS ═══════════════ -->
+  <div id="progress-section" class="bs-loading-box" hidden>
+    <div class="bs-loading-inner">
+      <div class="bs-spinner" style="margin:0 auto 24px"></div>
+      <div class="bs-loading-title" id="loading-title">Extracting Data</div>
+      <div class="bs-loading-sub"   id="loading-sub">Collecting items across all pages</div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SECTION 5 · ERROR ═══════════════ -->
+  <div id="error-section" class="bs-loading-box" hidden>
+    <div class="bs-loading-inner">
+      <div style="width:64px;height:64px;border-radius:50%;background:rgba(239,68,68,.08);border:2px solid rgba(239,68,68,.2);display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 24px">⚠️</div>
+      <div class="bs-loading-title" style="color:var(--danger)" id="error-title">Something went wrong</div>
+      <div class="bs-loading-sub" id="error-sub" style="margin-bottom:24px"></div>
+      <button id="error-back" class="bs-btn bs-btn-primary">← Back</button>
+    </div>
+  </div>
+
+  <!-- ═══════════════ SECTION 6 · RESULTS ═══════════════ -->
+  <div id="results-section" class="bs-results-layout" hidden>
+    <aside class="bs-sidebar">
+      <div style="background:rgba(34,197,94,.08);border:1px solid rgba(34,197,94,.2);border-radius:12px;padding:14px;text-align:center">
+        <div style="font-size:22px;margin-bottom:4px">✅</div>
+        <div style="font-size:.72rem;font-weight:800;color:var(--success);letter-spacing:.5px" id="lbl-complete">EXTRACTION COMPLETE</div>
+      </div>
+
+      <div>
+        <div class="bs-sidebar-section-title" id="lbl-summary">Summary</div>
+        <div id="summary-rows" style="display:flex;flex-direction:column;gap:6px"></div>
+      </div>
+
+      <div>
+        <div class="bs-sidebar-section-title" id="lbl-fields">Fields</div>
+        <div id="fields-chips" style="display:flex;flex-direction:column;gap:5px"></div>
+      </div>
+
+      <div style="margin-top:auto">
+        <div class="bs-sidebar-section-title" id="lbl-export">Export</div>
+        <div style="display:flex;flex-direction:column;gap:7px">
+          <button id="export-csv-side"  class="bs-btn bs-btn-primary bs-btn-full">↓ CSV</button>
+          <button id="export-json-side" class="bs-btn bs-btn-ghost bs-btn-full">↓ JSON</button>
+        </div>
+      </div>
+    </aside>
+
+    <main class="bs-results-main">
+      <div class="bs-search-row">
+        <input id="results-search" class="bs-input bs-input-sm" type="text" placeholder="🔍 Search..." style="padding-inline-start:16px;direction:ltr" />
+        <span id="results-count" class="bs-count-badge"></span>
+      </div>
+      <div class="bs-table-wrap">
+        <table class="bs-table">
+          <thead><tr id="results-head"></tr></thead>
+          <tbody id="results-body"></tbody>
+        </table>
+      </div>
+    </main>
+  </div>
 
   <script type="module" src="/assets/app.js"></script>
 </body>

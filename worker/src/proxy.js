@@ -67,19 +67,6 @@ export async function handleProxy(request, env) {
 
   let html = await upstream.text();
 
-  // ── inject <base href> so relative URLs still resolve ────
-  // Drop any existing <base> first.
-  html = html.replace(/<base\b[^>]*>/gi, "");
-  const baseTag = `<base href="${escapeAttr(targetUrl.toString())}">`;
-
-  if (/<head[^>]*>/i.test(html)) {
-    html = html.replace(/<head[^>]*>/i, (m) => m + baseTag);
-  } else if (/<html[^>]*>/i.test(html)) {
-    html = html.replace(/<html[^>]*>/i, (m) => m + "<head>" + baseTag + "</head>");
-  } else {
-    html = baseTag + html;
-  }
-
   // ── strip inline CSP <meta> tags ─────────────────────────
   // (some sites set CSP via <meta http-equiv> which still applies in iframes)
   html = html.replace(
@@ -90,6 +77,45 @@ export async function handleProxy(request, env) {
     /<meta[^>]+http-equiv=["']?X-Frame-Options["']?[^>]*>/gi,
     "",
   );
+
+  // ── neutralise common JS frame-busting patterns ──────────
+  // Many sites do `if (top != self) top.location = self.location` or
+  // similar to break out of frames. We rewrite the most common forms
+  // into no-ops so the page renders normally inside our modal. The
+  // iframe sandbox already blocks `allow-top-navigation` so even if
+  // a pattern slips through, the browser refuses the breakout — this
+  // is just belt-and-braces.
+  html = html.replace(/\btop\s*!=+\s*self\b/g,            "false");
+  html = html.replace(/\bself\s*!=+\s*top\b/g,            "false");
+  html = html.replace(/\bwindow\.top\s*!=+\s*window\.self\b/g, "false");
+  html = html.replace(/\bwindow\.self\s*!=+\s*window\.top\b/g, "false");
+  html = html.replace(/\btop\s*!=+\s*window\b/g,          "false");
+  html = html.replace(/\bparent\s*!=+\s*window\b/g,       "false");
+  html = html.replace(/\bwindow\.parent\s*!=+\s*window\b/g, "false");
+  html = html.replace(/\bwindow\.frameElement\s*!=+\s*null\b/g, "false");
+  html = html.replace(/\bif\s*\(\s*self\s*!=+\s*top\s*\)/g, "if(false)");
+  html = html.replace(/\bif\s*\(\s*top\s*!=+\s*self\s*\)/g, "if(false)");
+
+  // ── inject <base href> + prelude into <head> ────────────
+  // Prelude runs before the page's scripts so frameElement reads as
+  // null (defeats lazy `if (frameElement) ...` checks).
+  html = html.replace(/<base\b[^>]*>/gi, "");
+  const baseTag = `<base href="${escapeAttr(targetUrl.toString())}">`;
+  const prelude = `<script>
+    (function(){
+      try {
+        Object.defineProperty(window, 'frameElement', { get: function(){ return null; } });
+      } catch(_){}
+    })();
+  </script>`;
+
+  if (/<head[^>]*>/i.test(html)) {
+    html = html.replace(/<head[^>]*>/i, (m) => m + baseTag + prelude);
+  } else if (/<html[^>]*>/i.test(html)) {
+    html = html.replace(/<html[^>]*>/i, (m) => m + "<head>" + baseTag + prelude + "</head>");
+  } else {
+    html = baseTag + prelude + html;
+  }
 
   // ── inject overlay script before </body> ────────────────
   // We pass the runtime context (jobId, pagesUrl, source url) into a
