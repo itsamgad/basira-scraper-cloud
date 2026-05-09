@@ -1,32 +1,14 @@
-// ── Scrape handler ──────────────────────────────────────────
+// Pages Function — handles POST /api/scrape
+// Runs Playwright on Cloudflare Browser Rendering (binding = MYBROWSER)
+// configured in the Pages project's Functions → Bindings dashboard.
 //
-// This is the Cloudflare Browser Rendering port of the original
-// `pages/api/scraper.js` from the Next.js project.
-//
-// The original kept a Map of long-lived browsers across requests
-// (`activeBrowsers`) because Playwright was running on a server
-// the user controlled.  Worker invocations are short-lived and
-// stateless, so we collapse the entire flow into one request:
-// the browser opens, navigates, scrapes, closes, all inside a
-// single POST to /api/scrape.  The selection step happens earlier
-// on the client, in the iframe, via the overlay panel — so by
-// the time we get here we already have selectors.
-//
-// Pattern follows the @cloudflare/playwright docs:
-//
-//   import { launch } from "@cloudflare/playwright";
-//   const browser = await launch(env.MYBROWSER);
-//
-// (For users who prefer the namespaced form requested in the
-//  spec, `chromium.launch(env.MYBROWSER)` is also exported and
-//  works identically — see the README.)
+// Body: { url, jobId, selection: {...}, rowLimit?, stealth?, lang? }
 
 import { launch } from "@cloudflare/playwright";
-import { jsonResponse, errorResponse } from "./cors.js";
-import { saveResult, saveProgress } from "./results.js";
-import { addHistoryEntry } from "./history.js";
+import { jsonResponse, errorResponse, preflightResponse } from "../_lib/cors.js";
+import { saveResult, saveProgress } from "../_lib/results-helpers.js";
+import { addHistoryEntry } from "../_lib/history-helpers.js";
 
-// User-Agent pool used when stealth mode is enabled
 const USER_AGENTS = [
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
   "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
@@ -41,13 +23,14 @@ const USER_AGENTS = [
 ];
 const randomUA = () => USER_AGENTS[Math.floor(Math.random() * USER_AGENTS.length)];
 
-export async function handleScrape(request, env, ctx) {
-  if (request.method !== "POST")
-    return errorResponse("Use POST", env, 405);
+export async function onRequestOptions() { return preflightResponse(); }
+
+export async function onRequestPost(context) {
+  const { request, env } = context;
 
   let body;
   try { body = await request.json(); }
-  catch (e) { return errorResponse("Invalid JSON body", env, 400); }
+  catch (e) { return errorResponse("Invalid JSON body", 400); }
 
   const {
     url,
@@ -59,7 +42,7 @@ export async function handleScrape(request, env, ctx) {
   } = body || {};
 
   if (!url || !selection || !selection.parentSelector || !selection.itemSelector || !Array.isArray(selection.fields)) {
-    return errorResponse("Missing required fields: url, selection.parentSelector, selection.itemSelector, selection.fields", env, 400);
+    return errorResponse("Missing: url, selection.parentSelector, selection.itemSelector, selection.fields", 400);
   }
 
   const hardCap = parseInt(env.MAX_ROWS_HARD_CAP || "5000", 10);
@@ -68,19 +51,15 @@ export async function handleScrape(request, env, ctx) {
   const startTime = Date.now();
   let browser;
 
-  // Tell the frontend we've started right away.
   await saveProgress(env, jobId, {
     status: "starting", currentPage: 0, totalPages: "?",
     itemsCollected: 0, failedItems: 0,
   });
 
   try {
-    // ── launch Browser Rendering ──────────────────────────
     browser = await launch(env.MYBROWSER);
 
-    const contextOptions = {
-      viewport: { width: 1366, height: 900 },
-    };
+    const contextOptions = { viewport: { width: 1366, height: 900 } };
     if (stealth) {
       contextOptions.userAgent = randomUA();
       contextOptions.locale    = "en-US";
@@ -91,10 +70,10 @@ export async function handleScrape(request, env, ctx) {
       };
     }
 
-    const context = await browser.newContext(contextOptions);
+    const browserContext = await browser.newContext(contextOptions);
 
     if (stealth) {
-      await context.addInitScript(() => {
+      await browserContext.addInitScript(() => {
         Object.defineProperty(navigator, "webdriver", { get: () => undefined });
         Object.defineProperty(navigator, "plugins",   { get: () => [1, 2, 3] });
         Object.defineProperty(navigator, "languages", { get: () => ["en-US", "en"] });
@@ -103,9 +82,8 @@ export async function handleScrape(request, env, ctx) {
       });
     }
 
-    const page = await context.newPage();
+    const page = await browserContext.newPage();
     await page.goto(url, { waitUntil: "domcontentloaded", timeout: 30000 });
-    // give SPAs a beat to hydrate
     try { await page.waitForLoadState("networkidle", { timeout: 8000 }); } catch (_) {}
 
     const {
@@ -151,7 +129,6 @@ export async function handleScrape(request, env, ctx) {
         } else {
           failedItems++;
         }
-        // every 5 items, push a progress update
         if ((i + 1) % 5 === 0 || i === limited.length - 1) {
           await saveProgress(env, jobId, {
             status: "extracting", currentPage: 1, totalPages: 1,
@@ -164,21 +141,14 @@ export async function handleScrape(request, env, ctx) {
 
     const duration = Math.round((Date.now() - startTime) / 1000);
 
-    // ── persist to KV (best-effort) ───────────────────────
     if (jobId) {
       try { await saveResult(env, jobId, { url, fields, data }); } catch (e) { console.warn("saveResult:", e.message); }
       try {
         await addHistoryEntry(env, {
-          id: jobId,
-          url,
-          rows: validItemIndex,
-          failedItems,
-          fields,
-          loadingMethod,
-          duration,
+          id: jobId, url, rows: validItemIndex, failedItems,
+          fields, loadingMethod, duration,
         });
       } catch (e) { console.warn("addHistoryEntry:", e.message); }
-      // mark the job as done so the frontend stops polling progress
       await saveProgress(env, jobId, {
         status: "done", currentPage: 1, totalPages: 1,
         itemsCollected: validItemIndex, failedItems,
@@ -189,14 +159,10 @@ export async function handleScrape(request, env, ctx) {
     browser = null;
 
     return jsonResponse({
-      success: true,
-      jobId,
+      success: true, jobId,
       itemsScraped: validItemIndex,
-      failedItems,
-      fields,
-      data,
-      duration,
-    }, env);
+      failedItems, fields, data, duration,
+    });
   } catch (error) {
     console.error("Scrape error:", error);
     if (browser) { try { await browser.close(); } catch (_) {} }
@@ -205,11 +171,11 @@ export async function handleScrape(request, env, ctx) {
         status: "error", error: error.message || "Scrape failed",
       });
     }
-    return errorResponse(error.message || "Scrape failed", env, 500);
+    return errorResponse(error.message || "Scrape failed", 500);
   }
 }
 
-// ── Helpers ports of the originals ────────────────────────────
+// ── Helpers (ports of originals) ──────────────────────────────
 
 async function extractFieldValue(element, field, pageUrl) {
   if (field.type === "image") {
@@ -323,7 +289,6 @@ async function paginationLoad(page, containerSel, itemSel, buttonSel, fields, ma
   while (pageNum < maxPages) {
     pageNum++;
 
-    // tell the user which page we're on
     if (env && jobId) {
       await saveProgress(env, jobId, {
         status: "extracting", currentPage: pageNum, totalPages: "?",

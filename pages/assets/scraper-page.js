@@ -6,7 +6,6 @@
 // then asks the Worker to do the actual scrape on Cloudflare
 // Browser Rendering.
 
-import { WORKER_URL } from "/assets/config.js";
 import { T, typeIcon } from "/assets/i18n.js";
 
 const $ = (id) => document.getElementById(id);
@@ -164,7 +163,7 @@ async function runScrape(selection) {
   const progressTimer = setInterval(pollProgress, 1200);
 
   try {
-    const res = await fetch(`${WORKER_URL}/api/scrape`, {
+    const res = await fetch(`/api/scrape`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -197,7 +196,7 @@ async function runScrape(selection) {
 async function pollProgress() {
   try {
     const res = await fetch(
-      `${WORKER_URL}/api/results?action=progress&jobId=${encodeURIComponent(state.jobId)}`
+      `/api/results?action=progress&jobId=${encodeURIComponent(state.jobId)}`
     );
     if (!res.ok) return;
     const json = await res.json();

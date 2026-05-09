@@ -19,7 +19,6 @@
 // (NO `allow-top-navigation`) prevents the iframe from breaking out
 // even if a frame-busting pattern survives our rewriter.
 
-import { WORKER_URL } from "/assets/config.js";
 import { T, methodIcon, typeIcon, timeAgo } from "/assets/i18n.js";
 
 const $ = (id) => document.getElementById(id);
@@ -188,7 +187,7 @@ function openModal() {
   });
   if (state.rowLimit) params.set("rowLimit", String(state.rowLimit));
 
-  $("modal-iframe").src = `${WORKER_URL}/proxy?${params.toString()}`;
+  $("modal-iframe").src = `/proxy?${params.toString()}`;
   show("modal");
 
   // Listen for selection events from the iframe
@@ -320,7 +319,7 @@ async function runScrape(selection) {
 
   const progressTimer = setInterval(pollProgress, 1200);
   try {
-    const res = await fetch(`${WORKER_URL}/api/scrape`, {
+    const res = await fetch(`/api/scrape`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -354,7 +353,7 @@ async function pollProgress() {
   if (!state.jobId) return;
   try {
     const res = await fetch(
-      `${WORKER_URL}/api/results?action=progress&jobId=${encodeURIComponent(state.jobId)}`
+      `/api/results?action=progress&jobId=${encodeURIComponent(state.jobId)}`
     );
     if (!res.ok) return;
     const json = await res.json();
@@ -530,7 +529,7 @@ $("export-json-side").onclick= exportJSON;
 async function loadHistory() {
   const t = T[state.lang];
   try {
-    const res = await fetch(`${WORKER_URL}/api/history?action=list`);
+    const res = await fetch(`/api/history?action=list`);
     const data = await res.json();
     renderHistory(data.history || [], t);
   } catch (e) { renderHistory([], t); }
@@ -567,14 +566,14 @@ function renderHistory(history, t) {
   list.querySelectorAll("[data-del]").forEach((btn) => {
     btn.onclick = async () => {
       const id = btn.getAttribute("data-del");
-      await fetch(`${WORKER_URL}/api/history?action=delete&id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      await fetch(`/api/history?action=delete&id=${encodeURIComponent(id)}`, { method: "DELETE" });
       loadHistory();
     };
   });
 }
 
 $("history-clear").onclick = async () => {
-  await fetch(`${WORKER_URL}/api/history?action=clear`, { method: "DELETE" });
+  await fetch(`/api/history?action=clear`, { method: "DELETE" });
   loadHistory();
 };
 

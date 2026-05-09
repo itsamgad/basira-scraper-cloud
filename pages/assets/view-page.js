@@ -4,7 +4,6 @@
 // the Cloudflare Worker (which stores it in KV), then renders
 // the same results table + sidebar that scraper-page.js uses.
 
-import { WORKER_URL } from "/assets/config.js";
 import { T, typeIcon } from "/assets/i18n.js";
 
 const $ = (id) => document.getElementById(id);
@@ -38,7 +37,7 @@ if (!state.jobId) {
 async function loadJob() {
   try {
     const res = await fetch(
-      `${WORKER_URL}/api/results?action=get&jobId=${encodeURIComponent(state.jobId)}`
+      `/api/results?action=get&jobId=${encodeURIComponent(state.jobId)}`
     );
     if (!res.ok) {
       throw new Error(`Worker returned ${res.status}`);
